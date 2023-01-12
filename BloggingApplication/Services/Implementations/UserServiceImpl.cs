@@ -38,29 +38,24 @@ namespace BloggingApplication.Services.Implementations
         }
 
         /*--------------------- Login -----------------------*/
-        public async Task<UserInfoDto> Login(LoginUserDto dto)
+        
+        public async Task<ApplicationUser> FindByEmail(string email)
         {
-            ApplicationUser? user = await _userStore.FindByNameAsync(dto.Email, CancellationToken.None);
-            if (user == null)
-                throw new UserLoginException("Invalid Email!");
+            return await _userStore.FindByNameAsync(email, CancellationToken.None);
+        }
 
-            var passCheckResult = _hasher.VerifyHashedPassword(user, user.PasswordHash, dto.Password);
+        public bool IsPasswordCorrect(ApplicationUser user, string password)
+        {
+            var result = _hasher.VerifyHashedPassword(user, user.PasswordHash, password);
+            return (result== PasswordVerificationResult.Success)? true: false;
+        }
 
-            if (passCheckResult == PasswordVerificationResult.Success)
-            {
-                IdentityRole userRole = await _userRoleStore.GetUserSingleRoleAsync(user, CancellationToken.None);
-                if (userRole == null)
-                    throw new UserCrudException("-User has either no assigned roles OR\n- have multiple roles.");
-
-                RoleEnum role; 
-                Enum.TryParse<RoleEnum>(userRole.Name, out role);
-                user.Role = role;
-
-                return await ApplicationUserEntityToUserInfoDto(user, true);
-            }
-            else
-                throw new UserLoginException("Invalid Password!!");
-            
+        public async Task<RoleEnum> GetRole(ApplicationUser user)
+        {
+            IdentityRole userRole = await _userRoleStore.GetUserSingleRoleAsync(user.Id, CancellationToken.None);
+            RoleEnum role;
+            Enum.TryParse<RoleEnum>(userRole.Name, out role);
+            return role;
         }
 
         /*--------------------- User CRUD -----------------------*/
@@ -135,7 +130,7 @@ namespace BloggingApplication.Services.Implementations
                 throw new UserCrudException("User already deleted or does not exists!");
 
             //Check for role and assign to entity object
-            IdentityRole userRole = await _userRoleStore.GetUserSingleRoleAsync(user, CancellationToken.None);
+            IdentityRole userRole = await _userRoleStore.GetUserSingleRoleAsync(user.Id, CancellationToken.None);
             if (userRole == null)
                 throw new UserCrudException("- Invalid userId OR\n-User has either no assigned roles OR\n- have multiple roles.");
 
@@ -209,7 +204,7 @@ namespace BloggingApplication.Services.Implementations
             //Generate the token
 
             //Fetch role of a user from DB
-            IdentityRole userRole = await _userRoleStore.GetUserSingleRoleAsync(user, CancellationToken.None);
+            IdentityRole userRole = await _userRoleStore.GetUserSingleRoleAsync(user.Id, CancellationToken.None);
             if (userRole == null)
                 throw new UserCrudException("- Invalid userId OR\n-User has either no assigned roles OR\n- having multiple roles.");
             

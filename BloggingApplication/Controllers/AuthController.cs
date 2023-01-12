@@ -34,8 +34,23 @@ namespace BloggingApplication.Controllers
         [Route("Login")]
         public async Task<ActionResult<UserInfoDto>> Login(LoginUserDto dto)
         {
-            UserInfoDto user = await _userService.Login(dto);
-            return Ok(user);
+            ApplicationUser user = await _userService.FindByEmail(dto.Email);
+
+            //Chech user exists or not
+            if (user == null)
+                return BadRequest("Invalid Email. Try registring first.");
+
+            //Verify password
+            if (! _userService.IsPasswordCorrect(user, dto.Password))
+                return BadRequest("Invalid Password.");
+
+            //Fetch roles
+            user.Role = await _userService.GetRole(user);
+            if(user.Role == 0)
+                return BadRequest("Roles not found for user.");
+
+            //Prepare dto and return response
+            return Ok(await _userService.ApplicationUserEntityToUserInfoDto(user, isTokenRequired: true));
         }
     }
 }

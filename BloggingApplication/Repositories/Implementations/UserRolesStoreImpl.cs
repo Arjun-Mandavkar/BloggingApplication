@@ -13,7 +13,7 @@ namespace BloggingApplication.Repositories.Implementations
         {
             _connectionFactory = dbConnectionFactory;
         }
-        public async Task<IdentityRole> GetUserSingleRoleAsync(ApplicationUser user, CancellationToken cancellationToken)
+        public async Task<IdentityRole> GetUserSingleRoleAsync(int userId, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             string query1 = "SELECT [RoleId] FROM [UserRoles] WHERE UserId = @UserId";
@@ -22,7 +22,7 @@ namespace BloggingApplication.Repositories.Implementations
             using (var connection = _connectionFactory.GetDefaultConnection())
             {
                 await connection.OpenAsync(cancellationToken);
-                int roleId = await connection.QuerySingleOrDefaultAsync<int>(query1, new { UserId = user.Id });
+                int roleId = await connection.QuerySingleOrDefaultAsync<int>(query1, new { UserId = userId });
                 role = await connection.QuerySingleOrDefaultAsync<IdentityRole>(query2, new { RoleId = roleId });
             }
             return role;

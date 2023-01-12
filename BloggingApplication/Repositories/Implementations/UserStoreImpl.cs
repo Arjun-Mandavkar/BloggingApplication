@@ -76,7 +76,7 @@ namespace BloggingApplication.Repositories.Implementations
             using (var connection = _connectionFactory.GetDefaultConnection())
             {
                 await connection.OpenAsync(cancellationToken);
-                user = await connection.QuerySingleOrDefaultAsync<ApplicationUser>(query, new { Email = email });
+                user = await connection.QuerySingleAsync<ApplicationUser>(query, new { Email = email });
             }
             return user;
         }

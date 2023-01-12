@@ -1,12 +1,15 @@
 ﻿using BloggingApplication.Models;
 using BloggingApplication.Models.Dtos;
+using Microsoft.AspNetCore.Identity;
 
 namespace BloggingApplication.Services
 {
     public interface IUserService
     {
         public Task<UserInfoDto> Register(RegisterUserDto dto);
-        public Task<UserInfoDto> Login(LoginUserDto dto);
+        public Task<ApplicationUser> FindByEmail(string email);
+        public bool IsPasswordCorrect(ApplicationUser user, string password);
+        public Task<RoleEnum> GetRole(ApplicationUser user);
 
         /*--------------------- User CRUD -----------------------*/
         public Task<UserInfoDto> GetByEmail(string email);
