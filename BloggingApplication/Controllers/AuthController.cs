@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using System.Transactions;
 
 namespace BloggingApplication.Controllers
 {
@@ -26,8 +27,27 @@ namespace BloggingApplication.Controllers
         [Route("Register")]
         public async Task<ActionResult<UserInfoDto>> Register(RegisterUserDto dto)
         {
-            UserInfoDto user = await _userService.Register(dto);
-            return Ok(user);
+            ApplicationUser user = await _userService.FindByEmail(dto.Email);
+
+            //Chech user exists or not
+            if (user != null)
+                return BadRequest("Email already taken. Try signing in.");
+
+            using (var tr = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
+            {
+                //Create user
+                user = await _userService.CreateUser(dto);
+                if(user == null)
+                    return BadRequest("User creation failed.");
+
+                //Assign blogger role
+                user.Role = RoleEnum.BLOGGER;
+                bool res = await _userService.AssignRole(user, RoleEnum.BLOGGER);
+                if (!res)
+                    return StatusCode(500,"Assigning role to user failed.");
+                tr.Complete();
+            }
+            return StatusCode(201, await _userService.ApplicationUserEntityToUserInfoDto(user, isTokenRequired: true));
         }
 
         [HttpPost]

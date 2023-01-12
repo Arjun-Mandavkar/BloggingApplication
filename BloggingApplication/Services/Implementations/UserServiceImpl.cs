@@ -58,6 +58,30 @@ namespace BloggingApplication.Services.Implementations
             return role;
         }
 
+        /*--------------------- Registration -----------------------*/
+        public async Task<ApplicationUser> CreateUser(RegisterUserDto dto)
+        {
+            IdentityResult result = await _userStore.CreateAsync(await RegisterUserDtoToApplicationUserEntity(dto), CancellationToken.None);
+            if (!result.Succeeded)
+                return null;
+            return await FindByEmail(dto.Email);
+        }
+
+        public async Task<bool> AssignRole(ApplicationUser user, RoleEnum role)
+        {
+            int roleId = (int)role;
+            IdentityRole userRole = await _roleStore.FindByIdAsync(roleId.ToString(), CancellationToken.None);
+            if (userRole == null)
+                return false;
+
+            IdentityResult result = await _userRoleStore.AssignNewAsync(userRole, user, CancellationToken.None);
+            if(result.Succeeded)
+                return true;
+            else
+                return false;
+
+        }
+
         /*--------------------- User CRUD -----------------------*/
 
         public async Task<UserInfoDto> GetByEmail(string email)
