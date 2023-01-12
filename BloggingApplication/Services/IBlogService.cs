@@ -30,5 +30,9 @@ namespace BloggingApplication.Services
         /*--------------------- Owner -------------------------*/
         public Task<ApiResponseDto> AssignOwner(BlogOwnerDto dto);
         public Task<ApiResponseDto> RevokeOwner(BlogOwnerDto dto);
+
+        /*---------- Methods required for deleting User ---------*/
+        public Task<bool> UpdateCommentForUserDeletion(ApplicationUser user);
+        public Task<bool> UpdateOwnerEntryForUserDeletion(ApplicationUser user);
     }
 }

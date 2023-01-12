@@ -476,5 +476,22 @@ namespace BloggingApplication.Services.Implementations
             return user;
         }
 
+        public async Task<bool> UpdateCommentForUserDeletion(ApplicationUser user)
+        {
+            IdentityResult result = await _blogCommentStore.SetIsUserExistsFalse(user.Id);
+            if (result.Succeeded)
+                return true;
+            else
+                return false;
+        }
+
+        public async Task<bool> UpdateOwnerEntryForUserDeletion(ApplicationUser user)
+        {
+            IdentityResult result = await _blogOwnerStore.SetIsOwnerExistsFalse(user.Id);
+            if (result.Succeeded)
+                return true;
+            else
+                return false;
+        }
     }
 }
