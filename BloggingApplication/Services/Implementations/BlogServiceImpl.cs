@@ -457,7 +457,7 @@ namespace BloggingApplication.Services.Implementations
             ApplicationUser user = await FetchLoggedInUser();
 
             bool isAdmin = false;
-            IdentityRole role = await _userRolesStore.GetUserSingleRoleAsync(user, CancellationToken.None);
+            IdentityRole role = await _userRolesStore.GetUserSingleRoleAsync(user.Id, CancellationToken.None);
             if (role != null)
                 isAdmin = role.Name.Equals("ADMIN");
 
