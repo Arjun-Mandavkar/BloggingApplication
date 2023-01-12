@@ -1,0 +1,33 @@
+- How to use identity w/o Entity Framework
+https://markjohnson.io/articles/asp-net-core-identity-without-entity-framework/
+
+- How to make use of cancellationToken
+https://www.learmoreseekmore.com/2021/11/usage-of-cancellationtoken-in-aspnetcore-applications.html
+
+- Weather dto objects should be linked to service methods or not?
+=> https://stackoverflow.com/questions/20092440/pass-dto-to-service-layer
+
+- Transactions in dapper
+https://stackoverflow.com/questions/10363933/how-to-use-transactions-with-dapper-net
+https://dapper-tutorial.net/transaction
+
+- Coudn't convert Type to Task<Type>.
+https://stackoverflow.com/questions/14658001/cannot-implicitly-convert-type-string-to-system-threading-tasks-taskstring
+
+- Exception Handling
+https://stackoverflow.com/questions/38630076/asp-net-core-web-api-exception-handling
+
+- SQL Server ID Jump 1000 issue
+That is not an issue, it's caching feature. If that is not desired, run query: ALTER DATABASE SCOPED CONFIGURATION SET IDENTITY_CACHE = OFF;
+
+- What is ValidateIssuer and ValidateAudience in jwt bearer
+https://stackoverflow.com/questions/70597009/what-is-the-meaning-of-validateissuer-and-validateaudience-in-jwt
+
+- Enable ValidateIssuer and ValidateAudience
+https://stackoverflow.com/questions/61976960/asp-net-core-jwt-authentication-always-throwing-401-unauthorized
+
+- Wheather use singleton object for SqlConnection? [Bad Idea]
+https://stackoverflow.com/questions/1557592/is-using-a-singleton-for-the-connection-a-good-idea-in-asp-net-website
+
+- How to manage transaction from service layer. (UoW: Unit of Work)
+https://stackoverflow.com/questions/4950638/using-transactionscope-in-service-layer-for-unitofwork-operations
