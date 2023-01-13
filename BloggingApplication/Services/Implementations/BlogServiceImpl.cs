@@ -94,12 +94,12 @@ namespace BloggingApplication.Services.Implementations
             return _blogStore.GetAllAsync();
         }
 
-        public async Task<ApiResponseDto> Update(Blog blog)
+        public async Task<IdentityResult> Update(Blog blog)
         {
             //Check for valid blogId
             Blog detachedBlog = await Get(blog.Id);
             if (detachedBlog == null)
-                throw new InvalidOperationException("Invalid blog object.");
+                return IdentityResult.Failed(new IdentityError { Code = "Message", Description = "Invalid blog id." });
 
             //Fetch logged in user's details
             ApplicationUser user = await FetchLoggedInUser();
@@ -115,20 +115,20 @@ namespace BloggingApplication.Services.Implementations
             {
                 IdentityResult result = await _blogStore.UpdateAsync(blog);
                 if (!result.Succeeded)
-                    throw new BlogCrudException("Blog updation failed.");
+                    return IdentityResult.Failed(new IdentityError { Code = "Message", Description = "Blog updation failed." });
             }
             else
                 throw new UnauthorizedUserException("You are not allowed to edit this blog.");
 
-            return new ApiResponseDto(isSuccess: true, message: "Blog updated successfully.");
+            return IdentityResult.Success;
         }
 
-        public async Task<ApiResponseDto> Delete(int blogId)
+        public async Task<IdentityResult> Delete(int blogId)
         {
             //Check for valid blogId
             Blog blog = await _blogStore.GetByIdAsync(blogId);
             if (blog == null)
-                throw new BlogCrudException("Invalid blog Id OR blog already deleted.");
+                return IdentityResult.Failed(new IdentityError { Code = "Message", Description = "Invalid blog Id OR blog already deleted." });
 
             //Check wheather user is one of the owners or admin
             bool isOwner = await _blogOwnerStore.IsOwner(await BlogToBlogOwner(blog));
@@ -137,55 +137,90 @@ namespace BloggingApplication.Services.Implementations
             //Delete blog from blog store
             if (isAdmin || isOwner)
             {
-                IdentityResult result = await _blogStore.DeleteAsync(blog);
+                IdentityResult result = await _blogStore.DeleteAsync(blog.Id);
                 if (!result.Succeeded)
-                    throw new BlogCrudException("Blog deletion failed.");
+                    return IdentityResult.Failed(new IdentityError { Code = "Message", Description = "Blog deletion failed." });
             }
             else
                 throw new UnauthorizedUserException("You are not allowed to delete this blog.");
 
-            return new ApiResponseDto(isSuccess: true, message: "Blog deletd successfully.");
+            return IdentityResult.Success;
         }
 
         /*--------------------- Like -------------------------*/
-        public async Task<ApiResponseDto> LikeBlog(int blogId)
+
+        public async Task<bool> IsLiked(int blogId)
+        {
+            //Fetch detached blog object
+            Blog blog = await _blogStore.GetByIdAsync(blogId);
+            if (blog == null) return false;
+
+            //Fetch logged in user details
+            ApplicationUser user = await FetchLoggedInUser();
+
+            return await _blogLikesStore.IsLikedAsync(blog, user);
+        }
+        public async Task<IdentityResult> LikeBlog(int blogId)
         {
             //Fetch detached blog object
             Blog blog = await _blogStore.GetByIdAsync(blogId);
             if (blog == null)
-                throw new InvalidOperationException("Invalid blog Id.");
+                return IdentityResult.Failed(new IdentityError { Code = "Message", Description = "Blog not found" }); ;
 
             //Fetch logged in user details
             ApplicationUser user = await FetchLoggedInUser();
+
             bool res = await _blogLikesStore.IsLikedAsync(blog, user);
             if (res)
-                return new ApiResponseDto(false, "Already liked!");
+                return IdentityResult.Failed(new IdentityError { Code = "Message", Description = "Already Liked" });
+            else
+            {
+                using (var tx = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
+                {
+                    //Insert Like
+                    IdentityResult result = await _blogLikesStore.LikeAsync(blog, user);
+                    if (!result.Succeeded)
+                        return IdentityResult.Failed(new IdentityError { Code = "Message", Description = "Blog like failed!" });
 
-            //Insert Like
-            IdentityResult result = await _blogLikesStore.LikeAsync(blog, user);
-            if (!result.Succeeded)
-                throw new BlogOperationException("Blog like failed!");
-            return new ApiResponseDto(true, "Successfully liked the blog.");
+                    await _blogStore.IncrementLike(blog.Id);
+                    if (!result.Succeeded)
+                        return IdentityResult.Failed(new IdentityError { Code = "Message", Description = "Blog like failed!" });
+                    tx.Complete();
+                }
+                return IdentityResult.Success;
+            }
         }
 
-        public async Task<ApiResponseDto> DeleteLikeBlog(int blogId)
+        public async Task<IdentityResult> DeleteLikeBlog(int blogId)
         {
             //Fetch detached blog object
             Blog blog = await _blogStore.GetByIdAsync(blogId);
             if (blog == null)
-                throw new InvalidOperationException("Invalid blog Id.");
+                return IdentityResult.Failed(new IdentityError { Code = "Message", Description = "Blog not found" }); ;
 
             //Fetch logged in user details
             ApplicationUser user = await FetchLoggedInUser();
+
             bool res = await _blogLikesStore.IsLikedAsync(blog, user);
             if (!res)
-                return new ApiResponseDto(false, "You have not liked the blog.");
-
-            //Remove Like
-            IdentityResult result = await _blogLikesStore.UndoLikeAsync(blog, user);
-            if (!result.Succeeded)
-                throw new BlogOperationException("Remove like from blog failed!");
-            return new ApiResponseDto(true, "Successfully unliked the blog.");
+                return IdentityResult.Failed(new IdentityError { Code = "Message", Description = "Like not found" });
+            else
+            {
+                using (var tx = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
+                {
+                    //Remove Like
+                    IdentityResult result = await _blogLikesStore.UndoLikeAsync(blog, user);
+                    if (!result.Succeeded)
+                        return IdentityResult.Failed(new IdentityError { Code = "Message", Description = "Remove like from blog failed!" });
+                    
+                    result = await _blogStore.DecrementLike(blog.Id);
+                    if (!result.Succeeded)
+                        return IdentityResult.Failed(new IdentityError { Code = "Message", Description = "Remove like from blog failed!" });
+                    
+                    tx.Complete();
+                }
+                return IdentityResult.Success;
+            }
         }
 
         /*--------------------- Comment -------------------------*/
@@ -268,7 +303,7 @@ namespace BloggingApplication.Services.Implementations
             return await _blogCommentStore.GetAllFromBlogAsync(blogId);
         }
 
-        
+
         /*------------------- Assign Roles -------------------*/
         public async Task<IdentityResult> AssignRoles(BlogRoleDto dto)
         {
@@ -285,7 +320,7 @@ namespace BloggingApplication.Services.Implementations
             {
                 //Fetch the specified user object
                 ApplicationUser user = await _userStore.FindByIdAsync(dto.UserId.ToString(), CancellationToken.None);
-                if(user == null)
+                if (user == null)
                     return IdentityResult.Failed(new IdentityError { Code = "Message", Description = "User not found." });
                 IdentityResult result;
 

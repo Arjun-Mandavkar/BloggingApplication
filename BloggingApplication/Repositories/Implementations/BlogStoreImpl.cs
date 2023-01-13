@@ -66,15 +66,37 @@ namespace BloggingApplication.Repositories.Implementations
             return IdentityResult.Success;
         }
 
-        public async Task<IdentityResult> DeleteAsync(Blog blog)
+        public async Task<IdentityResult> DeleteAsync(int blogId)
         {
             string query = $@"DELETE FROM [Blogs]
-                              WHERE Id = @{nameof(Blog.Id)};
+                              WHERE Id = @BlogId;
                               ";
             using (var connection = _connectionFactory.GetDefaultConnection())
             {
                 await connection.OpenAsync();
-                await connection.ExecuteAsync(query, blog);
+                await connection.ExecuteAsync(query, new {BlogId = blogId});
+            }
+            return IdentityResult.Success;
+        }
+
+        public async Task<IdentityResult> IncrementLike(int blogId)
+        {
+            string query = $@"UPDATE [Blogs] SET [Likes] = [Likes] + 1 WHERE [Id] = @BlogId";
+            using (var connection = _connectionFactory.GetDefaultConnection())
+            {
+                await connection.OpenAsync();
+                await connection.ExecuteAsync(query, new { BlogId = blogId});
+            }
+            return IdentityResult.Success;
+        }
+
+        public async Task<IdentityResult> DecrementLike(int blogId)
+        {
+            string query = $@"UPDATE [Blogs] SET [Likes] = [Likes] - 1 WHERE [Id] = @BlogId";
+            using (var connection = _connectionFactory.GetDefaultConnection())
+            {
+                await connection.OpenAsync();
+                await connection.ExecuteAsync(query, new { BlogId = blogId });
             }
             return IdentityResult.Success;
         }

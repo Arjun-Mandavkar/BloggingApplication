@@ -39,42 +39,57 @@ namespace BloggingApplication.Controllers
         {
             IdentityResult result = _blogService.VerifyBlog(blog);
             if (!result.Succeeded)
-            {
-                IdentityError error = result.Errors.FirstOrDefault(e => e.Code == "Message");
-                return new ApiResponseDto(false, error.Description);
-            }
+                return ReturnError(result);
 
             result = await _blogService.Create(blog);
             if(! result.Succeeded)
-            {
-                IdentityError error = result.Errors.FirstOrDefault(e => e.Code == "Message");
-                return new ApiResponseDto(false, error.Description);
-            }
+                return ReturnError(result);
+
             return new ApiResponseDto(isSuccess: true, message: "Blog created successfully.");
         }
 
         [HttpPut("Update")]
         public async Task<ApiResponseDto> Update(Blog blog)
         {
-            return await _blogService.Update(blog);
+            IdentityResult result = await _blogService.Update(blog);
+            if (!result.Succeeded)
+                return ReturnError(result);
+            return new ApiResponseDto(isSuccess: true, message: "Blog updated successfully");
+
         }
         [HttpDelete("{blogId}")]
         public async Task<ApiResponseDto> Delete(int blogId)
         {
-            return await _blogService.Delete(blogId);
+            IdentityResult result = await _blogService.Delete(blogId);
+            if (!result.Succeeded)
+                return ReturnError(result);
+            return new ApiResponseDto(isSuccess: true, message: "Blog deleted successfully");
         }
 
 
         /*------------------------ Likes --------------------------*/
+        [HttpGet("IsLiked/{blogId}")]
+        public async Task<ActionResult<bool>> IsBlogLiked(int blogId)
+        {
+            return await _blogService.IsLiked(blogId);
+        }
+
         [HttpGet("Like/{blogId}")]
         public async Task<ActionResult<ApiResponseDto>> LikeBlog(int blogId)
         {
-            return await _blogService.LikeBlog(blogId);
+            IdentityResult result = await _blogService.LikeBlog(blogId);
+            if (!result.Succeeded)
+                return ReturnError(result);
+            return new ApiResponseDto(isSuccess: true, message: "Blog liked successfully");
+
         }
         [HttpDelete("Like/{blogId}")]
         public async Task<ActionResult<ApiResponseDto>> DeleteLikeBlog(int blogId)
         {
-            return await _blogService.DeleteLikeBlog(blogId);
+            IdentityResult result = await _blogService.DeleteLikeBlog(blogId);
+            if (!result.Succeeded)
+                return ReturnError(result);
+            return new ApiResponseDto(isSuccess: true, message: "Blog like removed successfully");
         }
 
         /*----------------------- Comments ------------------------*/
@@ -107,10 +122,7 @@ namespace BloggingApplication.Controllers
             if (result.Succeeded)
                 return new ApiResponseDto(isSuccess: true, message: "Roles assigned successfully.");
             else
-            {
-                IdentityError error = result.Errors.FirstOrDefault(e => e.Code == "Message");
-                return new ApiResponseDto(isSuccess: false, message: error.Description);
-            }
+                return ReturnError(result);
         }
         [HttpPost("RevokeRoles")]
         public async Task<ActionResult<ApiResponseDto>> RevokeRoles(BlogRoleDto dto)
@@ -118,6 +130,15 @@ namespace BloggingApplication.Controllers
             IdentityResult result = await _blogService.RevokeRoles(dto);
             if (result.Succeeded)
                 return new ApiResponseDto(isSuccess: true, message: "Roles revoked successfully.");
+            else
+                return ReturnError(result);
+        }
+
+        /*------------------- Helper methods -------------------*/
+        private ApiResponseDto ReturnError(IdentityResult result)
+        {
+            if (result.Succeeded)
+                return null;
             else
             {
                 IdentityError error = result.Errors.FirstOrDefault(e => e.Code == "Message");

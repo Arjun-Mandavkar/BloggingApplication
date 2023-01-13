@@ -12,12 +12,13 @@ namespace BloggingApplication.Services
         public IdentityResult VerifyBlog(Blog blog);
         public Task<Blog> Get(int blogId);
         public Task<IEnumerable<Blog>> GetAll();
-        public Task<ApiResponseDto> Delete(int blogId);
-        public Task<ApiResponseDto> Update(Blog blog);
+        public Task<IdentityResult> Delete(int blogId);
+        public Task<IdentityResult> Update(Blog blog);
 
         /*--------------------- Like -------------------------*/
-        public Task<ApiResponseDto> LikeBlog(int blogId);
-        public Task<ApiResponseDto> DeleteLikeBlog(int blogId);
+        public Task<bool> IsLiked(int blogId);
+        public Task<IdentityResult> LikeBlog(int blogId);
+        public Task<IdentityResult> DeleteLikeBlog(int blogId);
 
         /*--------------------- Comment -------------------------*/
         public Task<ApiResponseDto> CommentOnBlog(BlogCommentDto comment);
