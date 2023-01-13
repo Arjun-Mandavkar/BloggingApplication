@@ -13,15 +13,22 @@ namespace BloggingApplication.Services.Implementations
     {
         private IHttpContextAccessor _httpContextAccessor;
         private IBlogStore<Blog> _blogStore;
-        private IBlogLikesStore<Blog,ApplicationUser> _blogLikesStore;
+        private IBlogLikesStore<Blog, ApplicationUser> _blogLikesStore;
         private IBlogCommentsStore<BlogComment> _blogCommentStore;
         private IBlogOwnersStore<BlogOwner> _blogOwnerStore;
         private IBlogEditorsStore<Blog, ApplicationUser> _blogEditorStore;
         private IUserStore<ApplicationUser> _userStore;
-        private IUserRolesStore<IdentityRole,ApplicationUser> _userRolesStore;
-        
+        private IUserRolesStore<IdentityRole, ApplicationUser> _userRolesStore;
+        private Dictionary<string, string> Messages = new Dictionary<string, string>
+        {
+            {"message1","User already have an editor role." },
+            {"message2","User already have an owner role." },
+            {"message3","User does not have an editor role." },
+            {"message4","User does not have an owner role." }
+        };
+
         private readonly IConfiguration _configuration;
-        public BlogServiceImpl(IHttpContextAccessor httpContext, 
+        public BlogServiceImpl(IHttpContextAccessor httpContext,
                                IBlogStore<Blog> blogStore,
                                IConfiguration configuration,
                                IBlogLikesStore<Blog, ApplicationUser> blogLikesStore,
@@ -44,19 +51,9 @@ namespace BloggingApplication.Services.Implementations
         }
 
         /*--------------------- CRUD -------------------------*/
-        public async Task<ApiResponseDto> Create(Blog blog)
+        public async Task<IdentityResult> Create(Blog blog)
         {
-            //Check for character limits
-            int titleLimit = Int32.Parse(_configuration.GetSection("Blog:TitleCharLimit").Value);
-            int contentLimit = Int32.Parse(_configuration.GetSection("Blog:TitleCharLimit").Value);
-            if (blog.Title.IsNullOrEmpty() || blog.Content.IsNullOrEmpty())
-                throw new BlogCrudException($"Title or content cannot be empty.");
-            if (blog.Title.Length > titleLimit)
-                throw new BlogCrudException($"Title char limit is {titleLimit}.");
-            if (blog.Content.Length > contentLimit)
-                throw new BlogCrudException($"Content char limit is {contentLimit}.");
-
-            using(var tx = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
+            using (var tx = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
             {
                 //Create blog from blog store
                 Blog detachedBlog = await _blogStore.CreateAsync(blog);
@@ -71,9 +68,23 @@ namespace BloggingApplication.Services.Implementations
                 tx.Complete();
             }
 
-            return new ApiResponseDto (isSuccess:true, message:"Blog created successfully.");
+            return IdentityResult.Success;
         }
+        public IdentityResult VerifyBlog(Blog blog)
+        {
+            //Check for character limits
+            int titleLimit = Int32.Parse(_configuration.GetSection("Blog:TitleCharLimit").Value);
+            int contentLimit = Int32.Parse(_configuration.GetSection("Blog:ContentCharLimit").Value);
 
+            if (blog.Title.IsNullOrEmpty() || blog.Content.IsNullOrEmpty())
+                return IdentityResult.Failed(new IdentityError { Code = "Message", Description = "Title or content not allowed to be empty." });
+            if (blog.Title.Length > titleLimit)
+                return IdentityResult.Failed(new IdentityError { Code = "Message", Description = $"Title char limit is {titleLimit}." });
+            if (blog.Content.Length > contentLimit)
+                return IdentityResult.Failed(new IdentityError { Code = "Message", Description = $"Content char limit is {contentLimit}." });
+
+            return IdentityResult.Success;
+        }
         public async Task<Blog> Get(int blogId)
         {
             return await _blogStore.GetByIdAsync(blogId);
@@ -86,7 +97,7 @@ namespace BloggingApplication.Services.Implementations
         public async Task<ApiResponseDto> Update(Blog blog)
         {
             //Check for valid blogId
-            Blog detachedBlog = await _blogStore.GetByIdAsync(blog.Id);
+            Blog detachedBlog = await Get(blog.Id);
             if (detachedBlog == null)
                 throw new InvalidOperationException("Invalid blog object.");
 
@@ -99,8 +110,8 @@ namespace BloggingApplication.Services.Implementations
             bool isEditor = await _blogEditorStore.IsEditor(blog, user);
 
             bool isAdmin = await IsUserAdmin();
-            
-            if(isAdmin || isOwner || isEditor)
+
+            if (isAdmin || isOwner || isEditor)
             {
                 IdentityResult result = await _blogStore.UpdateAsync(blog);
                 if (!result.Succeeded)
@@ -108,8 +119,8 @@ namespace BloggingApplication.Services.Implementations
             }
             else
                 throw new UnauthorizedUserException("You are not allowed to edit this blog.");
-            
-            return new ApiResponseDto(isSuccess:true, message:"Blog updated successfully.");
+
+            return new ApiResponseDto(isSuccess: true, message: "Blog updated successfully.");
         }
 
         public async Task<ApiResponseDto> Delete(int blogId)
@@ -124,7 +135,7 @@ namespace BloggingApplication.Services.Implementations
             bool isAdmin = await IsUserAdmin();
 
             //Delete blog from blog store
-            if(isAdmin || isOwner)
+            if (isAdmin || isOwner)
             {
                 IdentityResult result = await _blogStore.DeleteAsync(blog);
                 if (!result.Succeeded)
@@ -180,14 +191,14 @@ namespace BloggingApplication.Services.Implementations
         /*--------------------- Comment -------------------------*/
         public async Task<ApiResponseDto> CommentOnBlog(BlogCommentDto comment)
         {
-            if(comment.Id != 0)
+            if (comment.Id != 0)
                 return new ApiResponseDto(isSuccess: false, message: "Comment object should be transient [id should be null].");
 
             //Create entity of BlogComment
             BlogComment commentEntity = await BlogCommentDtoToEntity(comment);
 
             BlogComment detachedComment = await _blogCommentStore.CreateAsync(commentEntity);
-            if (detachedComment == null) 
+            if (detachedComment == null)
                 throw new BlogOperationException("Comment insertion failed.");
 
             return new ApiResponseDto(isSuccess: true, message: "Comment inserted successfully.");
@@ -241,7 +252,7 @@ namespace BloggingApplication.Services.Implementations
 
             if (comment.Id == 0)
                 return new ApiResponseDto(isSuccess: false, message: "Comment object should be detached.");
-            
+
             //Check for correct blog id
             if (detachedObject.BlogId != comment.BlogId)
                 throw new BlogOperationException("Invalid combination of blog and comment.");
@@ -257,147 +268,171 @@ namespace BloggingApplication.Services.Implementations
             return await _blogCommentStore.GetAllFromBlogAsync(blogId);
         }
 
-        /*--------------------- Editor -------------------------*/
-        public async Task<ApiResponseDto> AssignEditor(BlogEditorDto dto)
+        
+        /*------------------- Assign Roles -------------------*/
+        public async Task<IdentityResult> AssignRoles(BlogRoleDto dto)
         {
             //Fetch detached blog object
             Blog blog = await _blogStore.GetByIdAsync(dto.BlogId);
             if (blog == null)
-                throw new BlogOperationException("Invalid blog Id");
+                return IdentityResult.Failed(new IdentityError { Code = "Message", Description = "Invalid blog id." });
 
             //Check logged in user is either owner or admin
             bool isOwner = await _blogOwnerStore.IsOwner(await BlogToBlogOwner(blog));
             bool isAdmin = await IsUserAdmin();
 
-            if (isAdmin || isOwner)
+            if (isOwner || isAdmin)
             {
                 //Fetch the specified user object
-                ApplicationUser user = await _userStore.FindByIdAsync(dto.UserId.ToString(),CancellationToken.None);
-                if (user == null)
-                    throw new BlogOperationException("Provided user id is incorrect.");
+                ApplicationUser user = await _userStore.FindByIdAsync(dto.UserId.ToString(), CancellationToken.None);
+                if(user == null)
+                    return IdentityResult.Failed(new IdentityError { Code = "Message", Description = "User not found." });
+                IdentityResult result;
 
-                bool isSpecifiedUserEditor = await _blogEditorStore.IsEditor(blog, user);
-
-                if (!isSpecifiedUserEditor)
+                //Assign roles one by one
+                if (dto.Roles.Contains(BlogRoleEnum.EDITOR))
                 {
-                    //Insert entry into editor table
-                    IdentityResult result = await _blogEditorStore.AssignEditor(blog, user);
-                    if (!result.Succeeded)
-                        throw new BlogOperationException("An error occured while assigning editor role.");
-                }
-                else
-                    throw new BlogOperationException("User already an editor.");
-                
-                return new ApiResponseDto(isSuccess: true, message: "Editor assigned successfully.");
-            }else
-                throw new UnauthorizedUserException("Only blog owners can add editors to blog.");
-        }
+                    result = await AssignEditor(blog, user);
 
-        public async Task<ApiResponseDto> RevokeEditor(BlogEditorDto dto)
+                    //If failed because of already assigned then skip to next step
+                    if (result.Errors.Any())
+                    {
+                        IdentityError error = result.Errors.FirstOrDefault(e => e.Code == "Message");
+                        if (error.Description != Messages["message1"])
+                            return result;
+                    }
+                }
+                if (dto.Roles.Contains(BlogRoleEnum.OWNER))
+                {
+                    result = await AssignOwner(blog, user);
+                    if (result.Errors.Any())
+                    {
+                        IdentityError error = result.Errors.FirstOrDefault(e => e.Code == "Message");
+                        if (error.Description != Messages["message2"])
+                            return result;
+                    }
+                }
+            }
+            else
+                throw new UnauthorizedUserException("Not authorized to assign roles");
+
+            return IdentityResult.Success;
+        }
+        public async Task<IdentityResult> RevokeRoles(BlogRoleDto dto)
         {
             //Fetch detached blog object
             Blog blog = await _blogStore.GetByIdAsync(dto.BlogId);
             if (blog == null)
-                throw new BlogOperationException("Invalid blog Id");
+                return IdentityResult.Failed(new IdentityError { Code = "Message", Description = "Invalid blog id." });
 
             //Check logged in user is either owner or admin
             bool isOwner = await _blogOwnerStore.IsOwner(await BlogToBlogOwner(blog));
             bool isAdmin = await IsUserAdmin();
-
-            if (isAdmin || isOwner)
+            if (isOwner || isAdmin)
             {
                 //Fetch the specified user object
                 ApplicationUser user = await _userStore.FindByIdAsync(dto.UserId.ToString(), CancellationToken.None);
                 if (user == null)
-                    throw new BlogOperationException("Provided user id is incorrect.");
+                    return IdentityResult.Failed(new IdentityError { Code = "Message", Description = "User not found." });
 
-                bool isSpecifiedUserEditor = await _blogEditorStore.IsEditor(blog, user);
-                if (isSpecifiedUserEditor)
+                IdentityResult result;
+
+                //Revoke roles one by one
+                if (dto.Roles.Contains(BlogRoleEnum.EDITOR))
                 {
-                    //Remove entry into editor table
-                    IdentityResult result = await _blogEditorStore.RevokeEditor(blog, user);
-                    if (!result.Succeeded)
-                        throw new BlogOperationException("An error occured while removing editor role.");
+                    result = await RevokeEditor(blog, user);
+                    //If failed because of not having role then skip to next step
+                    if (result.Errors.Any())
+                    {
+                        IdentityError error = result.Errors.FirstOrDefault(e => e.Code == "Message");
+                        if (error.Description != Messages["message3"])
+                            return result;
+                    }
                 }
-                else
-                    throw new BlogOperationException("User does not have an editor role.");
-
-                return new ApiResponseDto(isSuccess: true, message: "Editor removed successfully.");
+                if (dto.Roles.Contains(BlogRoleEnum.OWNER))
+                {
+                    result = await RevokeOwner(blog, user);
+                    //If failed because of not having role then skip to next step
+                    if (result.Errors.Any())
+                    {
+                        IdentityError error = result.Errors.FirstOrDefault(e => e.Code == "Message");
+                        if (error.Description != Messages["message3"])
+                            return result;
+                    }
+                }
             }
             else
-                throw new UnauthorizedUserException("Only blog owners can add editors to blog.");
+                throw new UnauthorizedUserException("Not authorized to assign roles");
+            return IdentityResult.Success;
+        }
+
+        /*--------------------- Editor -------------------------*/
+        public async Task<IdentityResult> AssignEditor(Blog blog, ApplicationUser user)
+        {
+            bool isSpecifiedUserEditor = await _blogEditorStore.IsEditor(blog, user);
+
+            if (!isSpecifiedUserEditor)
+            {
+                //Insert entry into editor table
+                IdentityResult result = await _blogEditorStore.AssignEditor(blog, user);
+                if (!result.Succeeded)
+                    return IdentityResult.Failed(new IdentityError { Code = "Message", Description = "An error occured while assigning editor role." });
+                return IdentityResult.Success;
+            }
+            else
+                return IdentityResult.Failed(new IdentityError { Code = "Message", Description = Messages["message1"] });
+        }
+
+        public async Task<IdentityResult> RevokeEditor(Blog blog, ApplicationUser user)
+        {
+            bool isSpecifiedUserEditor = await _blogEditorStore.IsEditor(blog, user);
+
+            if (isSpecifiedUserEditor)
+            {
+                //Remove entry into editor table
+                IdentityResult result = await _blogEditorStore.RevokeEditor(blog, user);
+                if (!result.Succeeded)
+                    return IdentityResult.Failed(new IdentityError { Code = "Message", Description = "An error occured while revoking editor role." });
+                return IdentityResult.Success;
+            }
+            else
+                return IdentityResult.Failed(new IdentityError { Code = "Message", Description = Messages["message3"] });
         }
 
         /*--------------------- Owner -------------------------*/
-        public async Task<ApiResponseDto> AssignOwner(BlogOwnerDto dto)
+        public async Task<IdentityResult> AssignOwner(Blog blog, ApplicationUser user)
         {
-            //Fetch detached blog object
-            Blog blog = await _blogStore.GetByIdAsync(dto.BlogId);
-            if (blog == null)
-                throw new BlogOperationException("Invalid blog Id");
-
-            //Check logged in user is either owner or admin
-            bool isOwner = await _blogOwnerStore.IsOwner(await BlogToBlogOwner(blog));
-            bool isAdmin = await IsUserAdmin();
-
-            if (isAdmin || isOwner)
+            bool isSpecifiedUserOwner = await _blogOwnerStore.IsOwner(BlogToBlogOwner(blog, user));
+            if (!isSpecifiedUserOwner)
             {
-                //Fetch the specified user object
-                ApplicationUser user = await _userStore.FindByIdAsync(dto.UserId.ToString(), CancellationToken.None);
-                if (user == null)
-                    throw new BlogOperationException("Provided user id is incorrect.");
+                //Insert entry in owner table
+                IdentityResult result = await _blogOwnerStore.AssignOwner(BlogToBlogOwner(blog, user));
+                if (!result.Succeeded)
+                    IdentityResult.Failed(new IdentityError { Code = "Message", Description = "Assigning user as owner failed." });
 
-                bool isSpecifiedUserOwner = await _blogOwnerStore.IsOwner(BlogToBlogOwner(blog,user));
-                if (!isSpecifiedUserOwner)
-                {
-                    //Insert entry in owner table
-                    IdentityResult result = await _blogOwnerStore.AssignOwner(BlogToBlogOwner(blog,user));
-                    if (!result.Succeeded)
-                        throw new BlogOperationException("Assigning user as owner failed.");
-
-                    return new ApiResponseDto(isSuccess: true, message: "User assigned owner role successfully");
-                }
-                else
-                    throw new BlogOperationException("User already have an owner role.");
+                return IdentityResult.Success;
             }
             else
-                throw new UnauthorizedUserException("Only blog owners can add owners to blog.");
+                return IdentityResult.Failed(new IdentityError { Code = "Message", Description = Messages["message2"] });
         }
 
-        public async Task<ApiResponseDto> RevokeOwner(BlogOwnerDto dto)
+        public async Task<IdentityResult> RevokeOwner(Blog blog, ApplicationUser user)
         {
-            //Fetch detached blog object
-            Blog blog = await _blogStore.GetByIdAsync(dto.BlogId);
-            if (blog == null)
-                throw new BlogOperationException("Invalid blog Id");
-
-            //Check logged in user is either owner or admin
-            bool isOwner = await _blogOwnerStore.IsOwner(await BlogToBlogOwner(blog));
-            bool isAdmin = await IsUserAdmin();
-
-            if (isAdmin || isOwner)
+            bool isSpecifiedUserOwner = await _blogOwnerStore.IsOwner(BlogToBlogOwner(blog, user));
+            if (isSpecifiedUserOwner)
             {
-                //Fetch the specified user object
-                ApplicationUser user = await _userStore.FindByIdAsync(dto.UserId.ToString(), CancellationToken.None);
-                if (user == null)
-                    throw new BlogOperationException("Provided user id is incorrect.");
+                //Remove entry from owner table
+                IdentityResult result = await _blogOwnerStore.RevokeOwner(BlogToBlogOwner(blog, user));
+                if (!result.Succeeded)
+                    return IdentityResult.Failed(new IdentityError { Code = "Message", Description = "Removing user from owner role failed." });
 
-                bool isSpecifiedUserOwner = await _blogOwnerStore.IsOwner(BlogToBlogOwner(blog, user));
-                if (isSpecifiedUserOwner)
-                {
-                    //Remove entry from owner table
-                    IdentityResult result = await _blogOwnerStore.RevokeOwner(BlogToBlogOwner(blog, user));
-                    if (!result.Succeeded)
-                        throw new BlogOperationException("Removing user from owner role failed.");
-
-                    return new ApiResponseDto(isSuccess: true, message: "User assigned owner role successfully");
-                }
-                else
-                    throw new BlogOperationException("User does not have owner role.");
+                return IdentityResult.Success;
             }
             else
-                throw new UnauthorizedUserException("Only blog owners can remove owners from blog.");
+                return IdentityResult.Failed(new IdentityError { Code = "Message", Description = Messages["message4"] });
         }
+
+
 
 
         /*--------------------- Dto Mapping methods ----------------*/
@@ -437,9 +472,9 @@ namespace BloggingApplication.Services.Implementations
                 {
                     Id = 0,
                     BlogId = dto.BlogId,
-                    UserId= user.Id,
-                    Text= dto.Text,
-                    UserName= user.Name,
+                    UserId = user.Id,
+                    Text = dto.Text,
+                    UserName = user.Name,
                     IsUserExists = true
                 };
             }

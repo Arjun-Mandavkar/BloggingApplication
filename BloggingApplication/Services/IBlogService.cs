@@ -1,5 +1,6 @@
 ﻿using BloggingApplication.Models;
 using BloggingApplication.Models.Dtos;
+using Microsoft.AspNetCore.Identity;
 using System.Security.Claims;
 
 namespace BloggingApplication.Services
@@ -7,7 +8,8 @@ namespace BloggingApplication.Services
     public interface IBlogService
     {
         /*--------------------- CRUD -------------------------*/
-        public Task<ApiResponseDto> Create(Blog blog);
+        public Task<IdentityResult> Create(Blog blog);
+        public IdentityResult VerifyBlog(Blog blog);
         public Task<Blog> Get(int blogId);
         public Task<IEnumerable<Blog>> GetAll();
         public Task<ApiResponseDto> Delete(int blogId);
@@ -23,13 +25,17 @@ namespace BloggingApplication.Services
         public Task<ApiResponseDto> EditComment(BlogCommentDto comment);
         public Task<IEnumerable<BlogComment>> GetAllCommentsOfBlog(int blogId);
 
+        /*------------------- Assign Roles -------------------*/
+        public Task<IdentityResult> AssignRoles(BlogRoleDto dto);
+        public Task<IdentityResult> RevokeRoles(BlogRoleDto dto);
+
         /*--------------------- Editor -------------------------*/
-        public Task<ApiResponseDto> AssignEditor(BlogEditorDto dto);
-        public Task<ApiResponseDto> RevokeEditor(BlogEditorDto dto);
+        public Task<IdentityResult> AssignEditor(Blog blog, ApplicationUser user);
+        public Task<IdentityResult> RevokeEditor(Blog blog, ApplicationUser user);
 
         /*--------------------- Owner -------------------------*/
-        public Task<ApiResponseDto> AssignOwner(BlogOwnerDto dto);
-        public Task<ApiResponseDto> RevokeOwner(BlogOwnerDto dto);
+        public Task<IdentityResult> AssignOwner(Blog blog, ApplicationUser user);
+        public Task<IdentityResult> RevokeOwner(Blog blog, ApplicationUser user);
 
         /*---------- Methods required for deleting User ---------*/
         public Task<bool> UpdateCommentForUserDeletion(ApplicationUser user);

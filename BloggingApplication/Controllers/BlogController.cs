@@ -4,8 +4,10 @@ using BloggingApplication.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using static Dapper.SqlMapper;
 
 namespace BloggingApplication.Controllers
 {
@@ -35,8 +37,22 @@ namespace BloggingApplication.Controllers
         [HttpPost("Create")]
         public async Task<ApiResponseDto> Create(Blog blog)
         {
-            return await _blogService.Create(blog);
+            IdentityResult result = _blogService.VerifyBlog(blog);
+            if (!result.Succeeded)
+            {
+                IdentityError error = result.Errors.FirstOrDefault(e => e.Code == "Message");
+                return new ApiResponseDto(false, error.Description);
+            }
+
+            result = await _blogService.Create(blog);
+            if(! result.Succeeded)
+            {
+                IdentityError error = result.Errors.FirstOrDefault(e => e.Code == "Message");
+                return new ApiResponseDto(false, error.Description);
+            }
+            return new ApiResponseDto(isSuccess: true, message: "Blog created successfully.");
         }
+
         [HttpPut("Update")]
         public async Task<ApiResponseDto> Update(Blog blog)
         {
@@ -83,28 +99,30 @@ namespace BloggingApplication.Controllers
             return await _blogService.GetAllCommentsOfBlog(blogId);
         }
 
-        /*---------------------- Editor Role ----------------------*/
-        [HttpPost("AssignEditor")]
-        public async Task<ActionResult<ApiResponseDto>> AssignEditor(BlogEditorDto dto)
+        /*---------------------- Assign Role ----------------------*/
+        [HttpPost("AssignRoles")]
+        public async Task<ActionResult<ApiResponseDto>> AssignRoles(BlogRoleDto dto)
         {
-            return await _blogService.AssignEditor(dto);
+            IdentityResult result = await _blogService.AssignRoles(dto);
+            if (result.Succeeded)
+                return new ApiResponseDto(isSuccess: true, message: "Roles assigned successfully.");
+            else
+            {
+                IdentityError error = result.Errors.FirstOrDefault(e => e.Code == "Message");
+                return new ApiResponseDto(isSuccess: false, message: error.Description);
+            }
         }
-        [HttpPost("RevokeEditor")]
-        public async Task<ActionResult<ApiResponseDto>> RevokeEditor(BlogEditorDto dto)
+        [HttpPost("RevokeRoles")]
+        public async Task<ActionResult<ApiResponseDto>> RevokeRoles(BlogRoleDto dto)
         {
-            return await _blogService.RevokeEditor(dto);
-        }
-
-        /*---------------------- Owner Role ----------------------*/
-        [HttpPost("AssignOwner")]
-        public async Task<ActionResult<ApiResponseDto>> AssignOwner(BlogOwnerDto dto)
-        {
-            return await _blogService.AssignOwner(dto);
-        }
-        [HttpPost("RevokeOwner")]
-        public async Task<ActionResult<ApiResponseDto>> RevokeOwner(BlogOwnerDto dto)
-        {
-            return await _blogService.RevokeOwner(dto);
+            IdentityResult result = await _blogService.RevokeRoles(dto);
+            if (result.Succeeded)
+                return new ApiResponseDto(isSuccess: true, message: "Roles revoked successfully.");
+            else
+            {
+                IdentityError error = result.Errors.FirstOrDefault(e => e.Code == "Message");
+                return new ApiResponseDto(isSuccess: false, message: error.Description);
+            }
         }
     }
 }
