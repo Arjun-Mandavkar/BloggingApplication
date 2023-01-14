@@ -224,35 +224,35 @@ namespace BloggingApplication.Services.Implementations
         }
 
         /*--------------------- Comment -------------------------*/
-        public async Task<ApiResponseDto> CommentOnBlog(BlogCommentDto comment)
+        public async Task<IdentityResult> CommentOnBlog(BlogCommentDto comment)
         {
             if (comment.Id != 0)
-                return new ApiResponseDto(isSuccess: false, message: "Comment object should be transient [id should be null].");
+                return IdentityResult.Failed(new IdentityError { Code = "Message", Description = "Comment object should be transient [id should be null]." });
 
             //Create entity of BlogComment
             BlogComment commentEntity = await BlogCommentDtoToEntity(comment);
 
             BlogComment detachedComment = await _blogCommentStore.CreateAsync(commentEntity);
             if (detachedComment == null)
-                throw new BlogOperationException("Comment insertion failed.");
+                return IdentityResult.Failed(new IdentityError { Code = "Message", Description = "Comment insertion failed." });
 
-            return new ApiResponseDto(isSuccess: true, message: "Comment inserted successfully.");
+            return IdentityResult.Success;
         }
 
-        public async Task<ApiResponseDto> DeleteComment(BlogCommentDto comment)
+        public async Task<IdentityResult> DeleteComment(BlogCommentDto comment)
         {
             BlogComment detachedObject = await _blogCommentStore.GetAsync(comment.Id);
             if (detachedObject == null)
-                throw new BlogOperationException("Invalid comment Id.");
+                return IdentityResult.Failed(new IdentityError { Code = "Message", Description = "Invalid comment Id." });
 
             ApplicationUser loggedInUser = await FetchLoggedInUser();
 
             Blog blog = await _blogStore.GetByIdAsync(detachedObject.BlogId);
             if (blog == null)
-                throw new BlogOperationException("Invalid blog Id.");
+                return IdentityResult.Failed(new IdentityError { Code = "Message", Description = "Invalid blog Id." });
 
             if (comment.Id == 0)
-                return new ApiResponseDto(isSuccess: false, message: "Comment object should be detached.");
+                return IdentityResult.Failed(new IdentityError { Code = "Message", Description = "Comment object should be detached." });
 
             //Check for correct user
             if (await IsUserAdmin())
@@ -264,19 +264,19 @@ namespace BloggingApplication.Services.Implementations
                 //Allow owners to delete comment
             }
             else if (loggedInUser.Id != detachedObject.UserId)
-                throw new BlogOperationException("Not authorized to delete the comment.");
+                throw new UnauthorizedUserException("Not authorized to delete the comment.");
 
             //Check for correct blog id
             if (detachedObject.BlogId != comment.BlogId)
-                throw new BlogOperationException("Invalid combination of blog and comment.");
+                return IdentityResult.Failed(new IdentityError { Code = "Message", Description = "Invalid combination of blog and comment." });
 
             IdentityResult result = await _blogCommentStore.DeleteAsync(await BlogCommentDtoToEntity(comment));
             if (!result.Succeeded)
-                throw new BlogOperationException("Comment deletion failed.");
+                return IdentityResult.Failed(new IdentityError { Code = "Message", Description = "Comment deletion failed." });
 
-            return new ApiResponseDto(isSuccess: true, message: "Comment deleted successfully.");
+            return IdentityResult.Success;
         }
-        public async Task<ApiResponseDto> EditComment(BlogCommentDto comment)
+        public async Task<IdentityResult> EditComment(BlogCommentDto comment)
         {
             BlogComment detachedObject = await _blogCommentStore.GetAsync(comment.Id);
             ApplicationUser loggedInUser = await FetchLoggedInUser();
@@ -286,17 +286,17 @@ namespace BloggingApplication.Services.Implementations
                 throw new UnauthorizedUserException("Not authorized to edit the comment.");
 
             if (comment.Id == 0)
-                return new ApiResponseDto(isSuccess: false, message: "Comment object should be detached.");
+                return IdentityResult.Failed(new IdentityError { Code = "Message", Description = "Comment object should be detached." });
 
             //Check for correct blog id
             if (detachedObject.BlogId != comment.BlogId)
-                throw new BlogOperationException("Invalid combination of blog and comment.");
+                return IdentityResult.Failed(new IdentityError { Code = "Message", Description = "Invalid combination of blog and comment." }); 
 
             IdentityResult result = await _blogCommentStore.UpdateAsync(await BlogCommentDtoToEntity(comment));
             if (!result.Succeeded)
-                throw new BlogOperationException("Comment updation failed.");
+                return IdentityResult.Failed(new IdentityError { Code = "Message", Description = "Comment updation failed." });
 
-            return new ApiResponseDto(isSuccess: true, message: "Comment updated successfully.");
+            return IdentityResult.Success;
         }
         public async Task<IEnumerable<BlogComment>> GetAllCommentsOfBlog(int blogId)
         {

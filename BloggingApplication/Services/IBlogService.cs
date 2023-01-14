@@ -21,9 +21,9 @@ namespace BloggingApplication.Services
         public Task<IdentityResult> DeleteLikeBlog(int blogId);
 
         /*--------------------- Comment -------------------------*/
-        public Task<ApiResponseDto> CommentOnBlog(BlogCommentDto comment);
-        public Task<ApiResponseDto> DeleteComment(BlogCommentDto comment);
-        public Task<ApiResponseDto> EditComment(BlogCommentDto comment);
+        public Task<IdentityResult> CommentOnBlog(BlogCommentDto comment);
+        public Task<IdentityResult> DeleteComment(BlogCommentDto comment);
+        public Task<IdentityResult> EditComment(BlogCommentDto comment);
         public Task<IEnumerable<BlogComment>> GetAllCommentsOfBlog(int blogId);
 
         /*------------------- Assign Roles -------------------*/

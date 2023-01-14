@@ -96,18 +96,30 @@ namespace BloggingApplication.Controllers
         [HttpPost("Comment")]
         public async Task<ActionResult<ApiResponseDto>> CommentOnBlog(BlogCommentDto dto)
         {
-            return await _blogService.CommentOnBlog(dto);
+            IdentityResult result = await _blogService.CommentOnBlog(dto);
+            if (!result.Succeeded)
+                return ReturnError(result);
+            return new ApiResponseDto(isSuccess: true, message: "Comment inserted successfully");
         }
-        [HttpDelete("Comment")]
+
+        [HttpDelete("Comment/Delete")]
         public async Task<ActionResult<ApiResponseDto>> DeleteComment(BlogCommentDto dto)
         {
-            return await _blogService.DeleteComment(dto);
+            IdentityResult result = await _blogService.DeleteComment(dto);
+            if (!result.Succeeded)
+                return ReturnError(result);
+            return new ApiResponseDto(isSuccess: true, message: "Comment deleted successfully");
         }
+
         [HttpPut("Comment")]
         public async Task<ActionResult<ApiResponseDto>> UpdateComment(BlogCommentDto dto)
         {
-            return await _blogService.EditComment(dto);
+            IdentityResult result = await _blogService.EditComment(dto);
+            if (!result.Succeeded)
+                return ReturnError(result);
+            return new ApiResponseDto(isSuccess: true, message: "Comment updated successfully");
         }
+
         [HttpGet("Comment/{blogId}")]
         public async Task<IEnumerable<BlogComment>> GetAllCommentsOfBlog(int blogId)
         {

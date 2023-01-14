@@ -51,7 +51,7 @@ namespace BloggingApplication
                 });
 
             builder.Services.AddControllers();
-
+            
             builder.Services.AddSingleton<IDbConnectionFactory,DbConnectionFactoryImpl>();
             builder.Services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
             builder.Services.AddScoped<IUserService, UserServiceImpl>();
@@ -77,13 +77,13 @@ namespace BloggingApplication
             // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())
             {
-                app.UseExceptionHandler("/ErrorDevEnv");
+                app.UseMyExceptionHandler("/ErrorDevEnv");
                 app.UseSwagger();
                 app.UseSwaggerUI();
             }
             else
             {
-                app.UseExceptionHandler("/Error");
+                app.UseMyExceptionHandler("/Error");
             }
             
 
