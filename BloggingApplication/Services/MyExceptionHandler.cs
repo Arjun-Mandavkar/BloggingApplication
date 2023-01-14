@@ -76,6 +76,7 @@ namespace BloggingApplication.Services
     {
         public static IApplicationBuilder UseMyExceptionHandler(this IApplicationBuilder builder, string path)
         {
+            Console.WriteLine("_________MyExceptionHandler middleware added to container.");
             return builder.UseMiddleware<MyExceptionHandler>(path);
         }
     }
