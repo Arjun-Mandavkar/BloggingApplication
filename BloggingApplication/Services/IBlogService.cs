@@ -27,6 +27,7 @@ namespace BloggingApplication.Services
         public Task<IEnumerable<BlogComment>> GetAllCommentsOfBlog(int blogId);
 
         /*------------------- Assign Roles -------------------*/
+        public Task<BlogAuthorsDto> GetAuthors(int blogId);
         public Task<IdentityResult> AssignRoles(BlogRoleDto dto);
         public Task<IdentityResult> RevokeRoles(BlogRoleDto dto);
 

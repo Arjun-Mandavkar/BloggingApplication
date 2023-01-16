@@ -13,6 +13,19 @@ namespace BloggingApplication.Repositories.Implementations
         {
             _connectionFactory = connectionFactory;
         }
+        public async Task<IEnumerable<int>> Get(int blogId)
+        {
+            string query = $@"SELECT [UserId]
+                              FROM [BlogEditors]
+                              WHERE BlogId = @BlogId";
+            IEnumerable<int> result = new List<int>();
+            using (var connection = _connectionFactory.GetDefaultConnection())
+            {
+                await connection.OpenAsync();
+                result = await connection.QueryAsync<int>(query, new { BlogId = blogId });
+            }
+            return result;
+        }
         public async Task<bool> IsEditor(Blog blog, ApplicationUser user)
         {
             string query = $@"SELECT [BlogId],[UserId] FROM [BlogEditors]

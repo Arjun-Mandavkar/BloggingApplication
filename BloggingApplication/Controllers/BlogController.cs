@@ -127,6 +127,12 @@ namespace BloggingApplication.Controllers
         }
 
         /*---------------------- Assign Role ----------------------*/
+        [HttpGet("Authors/{blogId}")]
+        public async Task<ActionResult<BlogAuthorsDto>> GetAuthors(int blogId)
+        {
+            return await _blogService.GetAuthors(blogId);
+        }
+
         [HttpPost("AssignRoles")]
         public async Task<ActionResult<ApiResponseDto>> AssignRoles(BlogRoleDto dto)
         {

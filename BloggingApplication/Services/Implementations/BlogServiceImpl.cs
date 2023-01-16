@@ -4,6 +4,7 @@ using BloggingApplication.Models.Dtos;
 using BloggingApplication.Repositories;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.IdentityModel.Tokens;
+using System.Linq;
 using System.Security.Claims;
 using System.Transactions;
 
@@ -17,8 +18,7 @@ namespace BloggingApplication.Services.Implementations
         private IBlogCommentsStore<BlogComment> _blogCommentStore;
         private IBlogOwnersStore<BlogOwner> _blogOwnerStore;
         private IBlogEditorsStore<Blog, ApplicationUser> _blogEditorStore;
-        private IUserStore<ApplicationUser> _userStore;
-        private IUserRolesStore<IdentityRole, ApplicationUser> _userRolesStore;
+        private IUserService _userService { get; }
         private Dictionary<string, string> Messages = new Dictionary<string, string>
         {
             {"message1","User already have an editor role." },
@@ -34,8 +34,7 @@ namespace BloggingApplication.Services.Implementations
                                IBlogLikesStore<Blog, ApplicationUser> blogLikesStore,
                                IBlogOwnersStore<BlogOwner> blogOwnerStore,
                                IBlogEditorsStore<Blog, ApplicationUser> blogEditorStore,
-                               IUserStore<ApplicationUser> userStore,
-                               IUserRolesStore<IdentityRole, ApplicationUser> userRolesStore,
+                               IUserService userService,
                                IBlogCommentsStore<BlogComment> blogCommentStore)
 
         {
@@ -46,8 +45,7 @@ namespace BloggingApplication.Services.Implementations
             _blogCommentStore = blogCommentStore;
             _blogOwnerStore = blogOwnerStore;
             _blogEditorStore = blogEditorStore;
-            _userStore = userStore;
-            _userRolesStore = userRolesStore;
+            _userService = userService;
         }
 
         /*--------------------- CRUD -------------------------*/
@@ -305,6 +303,26 @@ namespace BloggingApplication.Services.Implementations
 
 
         /*------------------- Assign Roles -------------------*/
+        public async Task<BlogAuthorsDto> GetAuthors(int blogId)
+        {
+            //Fetch detached blog object
+            Blog blog = await _blogStore.GetByIdAsync(blogId);
+            if (blog == null)
+                throw new BlogCrudException("Invalid blog id");
+
+            IEnumerable<int> ownerIds = await _blogOwnerStore.Get(blogId);
+            IEnumerable<int> editorIds = await _blogEditorStore.Get(blogId);
+
+            List<UserInfoDto> owners = new List<UserInfoDto>();
+            foreach (int ownerId in ownerIds)
+                owners.Add(await _userService.GetById(ownerId.ToString()));
+
+            List<UserInfoDto> editors = new List<UserInfoDto>(); //new List<UserInfoDto>()
+            foreach (int editorId in editorIds)
+                editors.Add(await _userService.GetById(editorId.ToString()));
+
+            return new BlogAuthorsDto { Owners = owners, Editors = editors };
+        }
         public async Task<IdentityResult> AssignRoles(BlogRoleDto dto)
         {
             //Fetch detached blog object
@@ -319,7 +337,7 @@ namespace BloggingApplication.Services.Implementations
             if (isOwner || isAdmin)
             {
                 //Fetch the specified user object
-                ApplicationUser user = await _userStore.FindByIdAsync(dto.UserId.ToString(), CancellationToken.None);
+                ApplicationUser user = await _userService.FindById(dto.UserId.ToString());
                 if (user == null)
                     return IdentityResult.Failed(new IdentityError { Code = "Message", Description = "User not found." });
                 IdentityResult result;
@@ -327,39 +345,57 @@ namespace BloggingApplication.Services.Implementations
                 //Assign roles one by one
                 if (dto.Roles.Contains(BlogRoleEnum.EDITOR))
                 {
-                    result = await AssignEditor(blog, user);
-
-                    if (result.Errors.Any())
+                    using (var tx = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
                     {
-                        IdentityError error = result.Errors.FirstOrDefault(e => e.Code == "Message");
-                        //If failed because of already having role then skip to next step
-                        if (error.Description != Messages["message1"])
-                            return result;
+                        result = await AssignEditor(blog, user);
+                        if (result.Errors.Any())
+                        {
+                            IdentityError error = result.Errors.FirstOrDefault(e => e.Code == "Message");
+                            //If failed because of already having role then skip to next step
+                            if (error.Description != Messages["message1"])
+                                return result;
+                        }
+
+                        result = await RevokeOwner(blog, user);
+                        //If failed because of not having role then skip to next step
+                        if (result.Errors.Any())
+                        {
+                            IdentityError error = result.Errors.FirstOrDefault(e => e.Code == "Message");
+                            if (error.Description != Messages["message3"])
+                                return result;
+                        }
+
+                        tx.Complete();
                     }
+                        
                 }
                 if (dto.Roles.Contains(BlogRoleEnum.OWNER))
                 {
-                    //Assign owner role
-                    result = await AssignOwner(blog, user);
-                    if (result.Errors.Any())
+                    using (var tx = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
                     {
-                        IdentityError error = result.Errors.FirstOrDefault(e => e.Code == "Message");
-                        //If failed because of already 
-                        if (error.Description != Messages["message2"])
-                            return result;
-                    }
+                        //Assign owner role
+                        result = await AssignOwner(blog, user);
+                        if (result.Errors.Any())
+                        {
+                            IdentityError error = result.Errors.FirstOrDefault(e => e.Code == "Message");
+                            //If failed because of already 
+                            if (error.Description != Messages["message2"])
+                                return result;
+                        }
 
-                    //And remove entry from editor, if user is already a user
-                    result = await RevokeEditor(blog, user);
-                    
-                    if (result.Errors.Any())
-                    {
-                        IdentityError error = result.Errors.FirstOrDefault(e => e.Code == "Message");
-                        //If failed because of not having role then skip to next step
-                        if (error.Description != Messages["message3"])
-                            return result;
-                    }
+                        //And remove entry from editor, if user is already a editor
+                        result = await RevokeEditor(blog, user);
 
+                        if (result.Errors.Any())
+                        {
+                            IdentityError error = result.Errors.FirstOrDefault(e => e.Code == "Message");
+                            //If failed because of not having role then skip to next step
+                            if (error.Description != Messages["message3"])
+                                return result;
+                        }
+
+                        tx.Complete();
+                    }
                 }
             }
             else
@@ -380,7 +416,7 @@ namespace BloggingApplication.Services.Implementations
             if (isOwner || isAdmin)
             {
                 //Fetch the specified user object
-                ApplicationUser user = await _userStore.FindByIdAsync(dto.UserId.ToString(), CancellationToken.None);
+                ApplicationUser user = await _userService.FindById(dto.UserId.ToString());
                 if (user == null)
                     return IdentityResult.Failed(new IdentityError { Code = "Message", Description = "User not found." });
 
@@ -539,13 +575,7 @@ namespace BloggingApplication.Services.Implementations
         private async Task<bool> IsUserAdmin()
         {
             ApplicationUser user = await FetchLoggedInUser();
-
-            bool isAdmin = false;
-            IdentityRole role = await _userRolesStore.GetUserSingleRoleAsync(user.Id, CancellationToken.None);
-            if (role != null)
-                isAdmin = role.Name.Equals("ADMIN");
-
-            return isAdmin;
+            return RoleEnum.ADMIN.Equals(await _userService.GetRole(user));
         }
 
         private async Task<ApplicationUser> FetchLoggedInUser()
@@ -553,7 +583,7 @@ namespace BloggingApplication.Services.Implementations
             string userId = _httpContextAccessor.HttpContext.User.Claims
                             .FirstOrDefault(c => c.Type == "Id").Value;
 
-            ApplicationUser user = await _userStore.FindByIdAsync(userId, CancellationToken.None);
+            ApplicationUser user = await _userService.FindById(userId.ToString());
             if (user == null)
                 throw new BlogCrudException("Logged in user details not found.");
 

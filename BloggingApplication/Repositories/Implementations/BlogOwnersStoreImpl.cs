@@ -76,9 +76,23 @@ namespace BloggingApplication.Repositories.Implementations
             using (var connection = _connectionFactory.GetDefaultConnection())
             {
                 await connection.OpenAsync();
-                detachedObject = await connection.QuerySingleOrDefaultAsync<BlogOwner>(query, new {BloId=blogId,UserId=userId});
+                detachedObject = await connection.QuerySingleOrDefaultAsync<BlogOwner>(query, new {BlogId=blogId,UserId=userId});
             }
             return detachedObject;
+        }
+        public async Task<IEnumerable<int>> Get(int blogId)
+        {
+            string query = $@"SELECT [UserId]
+                              FROM [BlogOwners]
+                              WHERE BlogId = @BlogId
+                              AND UserId != 0";
+            IEnumerable<int> result = new List<int>();
+            using (var connection = _connectionFactory.GetDefaultConnection())
+            {
+                await connection.OpenAsync();
+                result = await connection.QueryAsync<int>(query, new { BlogId = blogId });
+            }
+            return result;
         }
 
         public async Task<IdentityResult> Update(BlogOwner blog)

@@ -7,5 +7,6 @@ namespace BloggingApplication.Repositories
         public Task<bool> IsEditor(TBlog blog, TUser user);
         public Task<IdentityResult> AssignEditor(TBlog blog, TUser user);
         public Task<IdentityResult> RevokeEditor(TBlog blog, TUser user);
+        public Task<IEnumerable<int>> Get(int blogId);
     }
 }
