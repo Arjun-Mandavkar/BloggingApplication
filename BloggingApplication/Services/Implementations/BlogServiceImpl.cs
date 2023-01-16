@@ -329,23 +329,37 @@ namespace BloggingApplication.Services.Implementations
                 {
                     result = await AssignEditor(blog, user);
 
-                    //If failed because of already assigned then skip to next step
                     if (result.Errors.Any())
                     {
                         IdentityError error = result.Errors.FirstOrDefault(e => e.Code == "Message");
+                        //If failed because of already having role then skip to next step
                         if (error.Description != Messages["message1"])
                             return result;
                     }
                 }
                 if (dto.Roles.Contains(BlogRoleEnum.OWNER))
                 {
+                    //Assign owner role
                     result = await AssignOwner(blog, user);
                     if (result.Errors.Any())
                     {
                         IdentityError error = result.Errors.FirstOrDefault(e => e.Code == "Message");
+                        //If failed because of already 
                         if (error.Description != Messages["message2"])
                             return result;
                     }
+
+                    //And remove entry from editor, if user is already a user
+                    result = await RevokeEditor(blog, user);
+                    
+                    if (result.Errors.Any())
+                    {
+                        IdentityError error = result.Errors.FirstOrDefault(e => e.Code == "Message");
+                        //If failed because of not having role then skip to next step
+                        if (error.Description != Messages["message3"])
+                            return result;
+                    }
+
                 }
             }
             else

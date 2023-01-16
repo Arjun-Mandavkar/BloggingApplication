@@ -52,7 +52,7 @@ namespace BloggingApplication.Services
                 }
                 else
                 {
-                    throw new Exception($"Invalid path parameter for MyException handler: '{_path}'. It should be either'/Error' or 'ErrorDevEnv'.");
+                    throw new Exception($"Invalid path parameter for MyException handler: '{_path}'. It should be either'/Error' or '/ErrorDevEnv'.");
                 }
             }
             
