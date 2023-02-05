@@ -1,8 +1,8 @@
 ﻿using BloggingApplication.Models;
-using BloggingApplication.Services;
 using Microsoft.AspNetCore.Identity;
 using Dapper;
 using BloggingApplication.CustomExceptions;
+using BloggingApplication.DbConnection;
 
 namespace BloggingApplication.Repositories.Implementations
 {

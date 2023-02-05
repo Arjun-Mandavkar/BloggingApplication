@@ -1,5 +1,5 @@
-﻿using BloggingApplication.Models;
-using BloggingApplication.Services;
+﻿using BloggingApplication.DbConnection;
+using BloggingApplication.Models;
 using Dapper;
 using Microsoft.AspNetCore.Identity;
 using System.Runtime.InteropServices;

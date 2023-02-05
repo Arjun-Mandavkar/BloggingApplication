@@ -6,11 +6,19 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using System.Net;
 using System.Security.Claims;
 using static Dapper.SqlMapper;
 
 namespace BloggingApplication.Controllers
 {
+    public class BlogResponse
+    {
+        public IEnumerable<ResponseModel> Response { get; set; }
+
+        public HttpStatusCode StatusCode { get; set; }
+    }
+
     [Route("[controller]")]
     [ApiController]
     [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
@@ -121,9 +129,21 @@ namespace BloggingApplication.Controllers
         }
 
         [HttpGet("Comment/{blogId}")]
-        public async Task<IEnumerable<BlogComment>> GetAllCommentsOfBlog(int blogId)
+        public async Task<BlogResponse> GetAllCommentsOfBlog(int blogId)
         {
-            return await _blogService.GetAllCommentsOfBlog(blogId);
+            BlogResponse response = new BlogResponse();
+            try
+            {
+                var comments = await _blogService.GetAllCommentsOfBlog(blogId);
+                response.Response = comments;
+                response.StatusCode = HttpStatusCode.OK;
+            }
+            catch(Exception ex)
+            {
+                return response;
+            }
+
+            return response;
         }
 
         /*---------------------- Assign Role ----------------------*/

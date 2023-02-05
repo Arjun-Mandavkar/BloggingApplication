@@ -25,6 +25,7 @@ namespace BloggingApplication.Services
         public Task<IdentityResult> DeleteComment(BlogCommentDto comment);
         public Task<IdentityResult> EditComment(BlogCommentDto comment);
         public Task<IEnumerable<BlogComment>> GetAllCommentsOfBlog(int blogId);
+        public Task<bool> UpdateCommentForUserDeletion(ApplicationUser user);
 
         /*------------------- Assign Roles -------------------*/
         public Task<BlogAuthorsDto> GetAuthors(int blogId);
@@ -38,9 +39,6 @@ namespace BloggingApplication.Services
         /*--------------------- Owner -------------------------*/
         public Task<IdentityResult> AssignOwner(Blog blog, ApplicationUser user);
         public Task<IdentityResult> RevokeOwner(Blog blog, ApplicationUser user);
-
-        /*---------- Methods required for deleting User ---------*/
-        public Task<bool> UpdateCommentForUserDeletion(ApplicationUser user);
         public Task<bool> UpdateOwnerEntryForUserDeletion(ApplicationUser user);
     }
 }

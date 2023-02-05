@@ -1,10 +1,11 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.Runtime.Serialization;
 
 namespace BloggingApplication.Models
 {
-    public class BlogComment
+    public class BlogComment : ResponseModel
     {
-        [Key]
+        [Key]        
         public int Id { get; set; }
         [Required]
         public int BlogId { get; set; }

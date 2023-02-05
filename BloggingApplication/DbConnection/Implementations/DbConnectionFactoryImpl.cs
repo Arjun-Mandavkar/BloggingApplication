@@ -1,6 +1,7 @@
-﻿using Microsoft.Data.SqlClient;
+﻿using BloggingApplication.DbConnection;
+using Microsoft.Data.SqlClient;
 
-namespace BloggingApplication.Services.Implementations
+namespace BloggingApplication.DbConnection.Implementations
 {
     public class DbConnectionFactoryImpl : IDbConnectionFactory
     {
@@ -9,7 +10,7 @@ namespace BloggingApplication.Services.Implementations
         {
             _connectionString = configuration.GetConnectionString("DefaultConnection");
         }
-        
+
         public SqlConnection GetDefaultConnection()
         {
             return new SqlConnection(_connectionString);

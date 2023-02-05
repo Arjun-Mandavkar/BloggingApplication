@@ -1,6 +1,6 @@
 ﻿using Microsoft.Data.SqlClient;
 
-namespace BloggingApplication.Services
+namespace BloggingApplication.DbConnection
 {
     public interface IDbConnectionFactory
     {
